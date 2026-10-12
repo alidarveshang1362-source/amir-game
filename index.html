@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ترشناک | بازی سه‌بعدی</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050505;color:#fff;font-family:Tahoma,Arial,sans-serif}
+canvas{display:block;width:100%;height:100%;background:#050505}
+#menu,#over{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle,#180000,#000 75%)}
+.box{width:min(92%,430px);padding:30px 22px;background:rgba(8,8,8,.96);border:1px solid #700;border-radius:20px;box-shadow:0 0 45px #000}
+.logo{font-size:55px}
+h1{margin:6px 0;color:#e00000;font-size:38px;text-shadow:0 0 18px #600}
+p{color:#aaa;line-height:1.9}
+button{border:0;border-radius:12px;padding:14px 28px;background:#b00000;color:#fff;font-size:17px;font-weight:bold}
+button:active{transform:scale(.96)}
+#over{display:none}
+#hud{color:#fff;text-shadow:0 2px 5px #000;position:fixed;top:10px;right:10px;z-index:10001;min-width:175px;padding:10px 13px;border:1px solid #333;border-radius:12px;background:rgba(0,0,0,.68);font-size:13px}
+.row{display:flex;justify-content:space-between;margin:5px 0}
+#score{color:#ff4444}#best{color:#ffd000}
+#msg{position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:12;color:#ff5555;opacity:0;transition:.3s;text-align:center}
+#msg.show{opacity:1}
+#cross{position:fixed;left:50%;top:50%;width:5px;height:5px;transform:translate(-50%,-50%);background:#fff;border-radius:50%;z-index:8;box-shadow:0 0 7px #fff}
+#mobile{display:none;position:fixed;inset:0;z-index:10001;pointer-events:none}
+#joystick{position:absolute;left:28px;bottom:28px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.10);border:2px solid #fff;box-shadow:inset 0 0 25px rgba(0,0,0,.35);pointer-events:auto;touch-action:none}
+#joystick:before{content:"";position:absolute;inset:18px;border-radius:50%;border:1px solid rgba(255,255,255,.10)}
+#moveLabel{position:absolute;left:0;right:0;top:10px;text-align:center;color:#fff;font:bold 12px Tahoma,Arial,sans-serif;pointer-events:none;text-shadow:0 1px 4px #000}
+#stick{position:absolute;left:50%;top:50%;width:66px;height:66px;margin-left:-33px;margin-top:-33px;border-radius:50%;background:#fff;border:2px solid #111;box-shadow:0 0 12px rgba(255,255,255,.8);pointer-events:none;transition:transform .04s linear}
+#cameraTouch{position:absolute;right:0;top:0;width:62%;height:100%;pointer-events:auto;touch-action:none}
+#cameraHint{position:absolute;right:18px;bottom:28px;color:rgba(255,255,255,.55);font-size:11px;pointer-events:none;text-align:center;width:52%;transition:opacity .5s}
+@media(max-width:700px){#mobile{display:block}#hud{font-size:12px;min-width:155px}h1{font-size:32px}.logo{font-size:48px}}
+#soundToggle{position:fixed;left:12px;top:12px;z-index:15;border:1px solid #444;background:rgba(0,0,0,.7);color:#fff;border-radius:10px;padding:8px 12px;font-size:12px}
+#trapFlash{position:fixed;inset:0;z-index:13;pointer-events:none;opacity:0;background:rgba(120,0,0,.12);transition:opacity .08s}
+#hint{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:14;color:#aaa;font-size:11px;background:rgba(0,0,0,.45);padding:6px 10px;border-radius:8px}
+.difficulty{display:flex;gap:12px;justify-content:center;margin:18px 0;direction:rtl}
+.difficulty button{min-width:120px}
+#hardMode{background:#8d0000}
+#easyMode{background:#ddd;color:#111}
+body.easy-mode #hint{color:#333;background:rgba(255,255,255,.7)}
+body.easy-mode #cross{background:#111;box-shadow:none}
+body.easy-mode #msg{color:#900}
+#flashlightBeam{display:none}
+</style>
+</head>
+<body>
+  <div id="menu">
+ <div class="box">
+  <div class="logo">👁️</div>
+  <h1>ترشناک</h1>
+  <p>سختی بازی را انتخاب کن</p>
+  <div class="difficulty">
+    <button type="button" id="hardMode">🔦 سخت</button>
+    <button type="button" id="easyMode">💡 آسان</button>
+  </div>
+  <p style="font-size:12px">سخت: تاریکی کامل و چراغ‌قوه<br>آسان: محیط روشن و بدون چراغ‌قوه</p>
+ </div>
+</div>
+
+<div id="hud">
+ <div class="row"><span>امتیاز فعلی:</span><b id="score">0</b></div>
+ <div class="row"><span>بیشترین امتیاز:</span><b id="best">0</b></div>
+ <div class="row"><span>کلیدها:</span><b id="keys">0 / 3</b></div>
+ <div class="row"><span>زمان:</span><b id="time">0</b></div>
+</div>
+
+<button id="soundToggle">🔊 صدا روشن</button>
+<div id="trapFlash"></div>
+<div id="cross"></div>
+<div id="msg"></div>
+<div id="hint">در حالت سخت چراغ‌قوه را روشن نگه دار...</div>
+
+<div id="mobile">
+  <div id="cameraHint">برای چرخاندن دوربین، صفحه را به چپ و راست بکش ↔</div>
+  <div id="joystick" aria-label="دکمه حرکت">
+    <div id="moveLabel">حرکت</div>
+    <div id="stick"></div>
+  </div>
+  <div id="cameraTouch"></div>
+</div>
+
+<div id="over">
+ <div class="box">
+  <div class="logo">🌑</div>
+  <h1 id="endTitle">پایان بازی</h1>
+  <p id="endText"></p>
+  <button id="restart">🔄 دوباره بازی کن</button>
+ </div>
+</div>
+
+<script>
+"use strict";
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+let W=innerWidth,H=innerHeight,DPR=1;
+
+function resize(){
+  W=innerWidth;H=innerHeight;DPR=1;
+  canvas.width=Math.floor(W*DPR);
+  canvas.height=Math.floor(H*DPR);
+  canvas.style.width=W+"px";
+  canvas.style.height=H+"px";
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+addEventListener("resize",resize);
+resize();
+
+const FOV=Math.PI/3;
+const MAP=[
+"################",
+"#..............#",
+"#..####........#",
+"#........#.....#",
+"#........#.....#",
+"#..##....#..#..#",
+"#...........#..#",
+"#....#####.....#",
+"#..............#",
+"#..#........#..#",
+"#..#........#..#",
+"#..............#",
+"#.....##.......#",
+"#..............#",
+"#..............#",
+"################"
+];
+const MW=MAP[0].length,MH=MAP.length;
+
+let player={x:2.5,y:1.5,a:0};
+let got=0,playing=false,ended=false,time=0,score=0;
+let gameMode="hard";
+let best=Number(localStorage.getItem("tarsnakBest")||0);
+document.getElementById("best").textContent=best;
+
+const keySpots=[
+ {x:13.3,y:2.5,taken:false},
+ {x:2.5,y:12.5,taken:false},
+ {x:13.2,y:13.3,taken:false}
+];
+const exit={x:8.5,y:1.5};
+const traps=[
+ {x:5.5,y:1.5,hit:false},{x:10.5,y:3.5,hit:false},
+ {x:3.5,y:6.5,hit:false},{x:11.5,y:8.5,hit:false},
+ {x:6.5,y:10.5,hit:false},{x:12.5,y:12.5,hit:false}
+];
+const ghost={x:13.2,y:11.5};
+const normalGhostSpeed=1.15;
+const hardGhostSpeed=1.85;
+const ghostRadius=.24;
+const held={};
+let turn=0,last=performance.now();
+
+function wall(x,y){
+  const ix=Math.floor(x),iy=Math.floor(y);
+  return ix<0iy<0ix>=MWiy>=MHMAP[iy][ix]==="#";
+}
+function move(dx,dy){
+  const r=.18;
+  if(!wall(player.x+dx+r*Math.sign(dx),player.y)&&
+     !wall(player.x+dx-r*Math.sign(dx),player.y))player.x+=dx;
+  if(!wall(player.x,player.y+dy+r*Math.sign(dy))&&
+     !wall(player.x,player.y+dy-r*Math.sign(dy)))player.y+=dy;
+}
+function dist(ax,ay,bx,by){return Math.hypot(ax-bx,ay-by)}
+function hasLineOfSight(ax,ay,bx,by){
+  const d=Math.hypot(bx-ax,by-ay);
+  const steps=Math.ceil(d/.08);
+  for(let i=1;i<steps;i++){
+    const t=i/steps;
+    if(wall(ax+(bx-ax)*t,ay+(by-ay)*t))return false;
+  }
+  return true;
+}
+function moveGhost(dx,dy){
+  const r=ghostRadius,nx=ghost.x+dx,ny=ghost.y+dy;
+  if(!wall(nx+r,ghost.y)&&!wall(nx-r,ghost.y)&&
+     !wall(nx,ghost.y+r)&&!wall(nx,ghost.y-r))ghost.x=nx;
+  if(!wall(ghost.x,ny+r)&&!wall(ghost.x,ny-r)&&
+     !wall(ghost.x+r,ny)&&!wall(ghost.x-r,ny))ghost.y=ny;
+}
+function reset(){
+  player={x:2.5,y:1.5,a:0};
+  ghost.x=13.2;ghost.y=11.5;
+<canvas id="game"></canvas>
+keySpots.forEach(k=>k.taken=false);
+  traps.forEach(t=>t.hit=false);
+  got=0;score=0;time=0;ended=false;
+  document.getElementById("score").textContent="0";
+  document.getElementById("keys").textContent="0 / 3";
+  document.getElementById("time").textContent="0";
+}
+window.start=function(mode="hard"){
+  gameMode=mode;
+  reset();
+  document.getElementById("menu").style.display="none";
+  document.getElementById("over").style.display="none";
+  document.getElementById("hud").style.display="block";
+  document.getElementById("mobile").style.display="";
+  const beam=document.getElementById("flashlightBeam");
+  if(beam)beam.style.display=gameMode==="hard"?"block":"none";
+  document.body.classList.toggle("easy-mode",gameMode==="easy");
+  playing=true;
+  beep(520,.08);
+  startAmbient();
+};
+function finish(win,text){
+  if(ended)return;
+  ended=true;playing=false;
+  stopAmbient();
+  score=Math.max(0,score+Math.max(0,1000-Math.floor(time*10)));
+  if(score>best){best=score;localStorage.setItem("tarsnakBest",best)}
+  document.getElementById("score").textContent=score;
+  document.getElementById("best").textContent=best;
+  document.getElementById("endTitle").textContent=win?"🎉 موفق شدی!":"🌑 پایان بازی";
+  document.getElementById("endText").innerHTML=text+
+    "<br><br>امتیاز این بازی: <b>"+score+"</b><br>بیشترین امتیاز: <b>"+best+"</b>";
+  document.getElementById("over").style.display="flex";
+  beep(win?800:150,.25);
+}
+function message(t){
+  const e=document.getElementById("msg");
+  e.textContent=t;e.classList.add("show");
+  clearTimeout(message.timer);
+  message.timer=setTimeout(()=>e.classList.remove("show"),2200);
+}
+
+let audio=null,soundOn=true,musicTimer=null;
+function tone(freq,dur,volume=.025,type="sine"){
+  if(!soundOn)return;
+  try{
+    audio=audionew(window.AudioContextwindow.webkitAudioContext)();
+    if(audio.state==="suspended")audio.resume();
+    const o=audio.createOscillator(),g=audio.createGain();
+    o.type=type;o.frequency.value=freq;g.gain.value=volume;
+    o.connect(g);g.connect(audio.destination);o.start();
+    g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+dur);
+    o.stop(audio.currentTime+dur);
+  }catch(e){}
+}
+function trapSound(){
+  tone(95,.18,.045,"square");
+  setTimeout(()=>tone(58,.22,.035,"sawtooth"),90);
+}
+function footstep(){tone(72,.07,.018,"triangle")}
+function startAmbient(){
+  clearInterval(musicTimer);
+  const notes=[55,49,58,46,52,43,49,41];
+  let i=0;
+  musicTimer=setInterval(()=>{
+    if(!playing||!soundOn)return;
+    tone(notes[i++%notes.length],.7,.008,"sine");
+  },700);
+}
+function stopAmbient(){clearInterval(musicTimer);musicTimer=null}
+function beep(freq,dur){
+  try{
+    audio=audionew(window.AudioContextwindow.webkitAudioContext)();
+    if(audio.state==="suspended")audio.resume();
+    const o=audio.createOscillator(),g=audio.createGain();
+    o.frequency.value=freq;o.type="sine";g.gain.value=.035;
+    o.connect(g);g.connect(audio.destination);o.start();
+    g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+dur);
+    o.stop(audio.currentTime+dur);
+  }catch(e){}
+}
+
+function update(dt){
+  if(!playing)return;
+  time+=dt;
+  const speed=2.5*dt;
+  let dx=0,dy=0;
+  if(held.w){dx+=Math.cos(player.a)*speed;dy+=Math.sin(player.a)*speed}
+  if(held.s){dx-=Math.cos(player.a)*speed;dy-=Math.sin(player.a)*speed}
+  if(held.a){dx+=Math.cos(player.a-Math.PI/2)*speed;dy+=Math.sin(player.a-Math.PI/2)*speed}
+  if(held.d){dx+=Math.cos(player.a+Math.PI/2)*speed;dy+=Math.sin(player.a+Math.PI/2)*speed}
+  move(dx,dy);
+  if((Math.abs(dx)+Math.abs(dy))>.001&&Math.random()<dt*3)footstep();
+  player.a+=turn*2.4*dt;
+  turn=0;
+
+  for(const k of keySpots){
+    if(!k.taken&&dist(player.x,player.y,k.x,k.y)<.65){
+      k.taken=true;got++;score+=250;
+      document.getElementById("keys").textContent=got+" / 3";
+      beep(700,.1);
+      if(got===3){
+        message("هر سه کلید پیدا شد! به در خروج برو.");
+        beep(900,.12);
+      }
+    }
+  }
+  if(got===3&&dist(player.x,player.y,exit.x,exit.y)<1)
+    finish(true,"آفرین! راه خروج را پیدا کردی.");
+  for(const t of traps){
+    if(!t.hit&&dist(player.x,player.y,t.x,t.y)<.52){
+      t.hit=true;message("صدای تله! 😨");trapSound();
+      const flash=document.getElementById("trapFlash");
+      flash.style.opacity=".8";
+      setTimeout(()=>flash.style.opacity="0",100);
+    }
+  }
+
+  const gd=dist(player.x,player.y,ghost.x,ghost.y);
+  const ghostCanSeePlayer=hasLineOfSight(ghost.x,ghost.y,player.x,player.y);
+  if(ghostCanSeePlayer&&gd<10&&Math.random()<dt*(1.3+(10-gd)*.4))
+    tone(58,.09,.035,"square");
+
+  if(ghostCanSeePlayer&&gd<9){
+    const gx=(player.x-ghost.x)/Math.max(gd,.01);
+    const gy=(player.y-ghost.y)/Math.max(gd,.01);
+    moveGhost(gx*(gameMode==="hard"?hardGhostSpeed:normalGhostSpeed)*dt,
+              gy*(gameMode==="hard"?hardGhostSpeed:normalGhostSpeed)*dt);
+  }
+  if(gd<.55)finish(false,"ترشناک به تو رسید.");
+
+  score=Math.max(0,score);
+  document.getElementById("score").textContent=score+Math.max(0,Math.floor(1000-time*10));
+  document.getElementById("time").textContent=Math.floor(time);
+}
+
+function render(){
+  const sky=ctx.createLinearGradient(0,0,0,H/2);
+  sky.addColorStop(0,"#030303");sky.addColorStop(1,"#160303");
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H/2);
+  const floor=ctx.createLinearGradient(0,H/2,0,H);
+  floor.addColorStop(0,"#111");floor.addColorStop(1,"#030303");
+  ctx.fillStyle=floor;ctx.fillRect(0,H/2,W,H/2);
+
+  const rays=Math.min(180,Math.max(80,Math.floor(W/6)));
+  const strip=W/rays,zBuffer=new Float32Array(rays);
+
+  for(let i=0;i<rays;i++){
+    const cam=(i/rays-.5)*FOV,ra=player.a+cam;
+    const rdx=Math.cos(ra),rdy=Math.sin(ra);
+    let mapX=Math.floor(player.x),mapY=Math.floor(player.y);
+    const deltaX=Math.abs(1/(rdx||1e-9));
+    const deltaY=Math.abs(1/(rdy||1e-9));
+    const stepX=rdx<0?-1:1,stepY=rdy<0?-1:1;
+    let sideX=rdx<0?(player.x-mapX)*deltaX:(mapX+1-player.x)*deltaX;
+    let sideY=rdy<0?(player.y-mapY)*deltaY:(mapY+1-player.y)*deltaY;
+    let side=0,hit=false,d=25;
+
+    for(let n=0;n<64&&!hit;n++){
+      if(sideX<sideY){sideX+=deltaX;mapX+=stepX;side=0}
+      else{sideY+=deltaY;mapY+=stepY;side=1}
+      if(mapX<0mapY<0mapX>=MWmapY>=MHMAP[mapY][mapX]==="#"){
+        hit=true;
+        d=side===0?(mapX-player.x+(1-stepX)/2)/(rdx||1e-9):
+          (mapY-player.y+(1-stepY)/2)/(rdy||1e-9);
+      }
+    }
+    const corrected=Math.max(.05,d*Math.cos(cam));
+    zBuffer[i]=corrected;
+    const h=Math.min(H*2,H/(corrected*.82));
+    const shade=Math.max(4,Math.floor(115/(1+corrected*.25)));
+    if(gameMode==="easy"){
+      const eShade=Math.max(150,Math.floor(245/(1+corrected*.08)));
+      ctx.fillStyle=rgb(${eShade},${eShade},${eShade});
+    }else{
+      ctx.fillStyle=rgb(${shade},${Math.floor(shade*.72)},${Math.floor(shade*.72)});
+    }
+    ctx.fillRect(i*strip,(H-h)/2,strip+1,h);
+  }
+
+  function projectSprite(x,y){
+    const dx=x-player.x,dy=y-player.y,d=Math.hypot(dx,dy);
+    let ang=Math.atan2(dy,dx)-player.a;
+    while(ang>Math.PI)ang-=Math.PI*2;
+    while(ang<-Math.PI)ang+=Math.PI*2;
+    if(Math.abs(ang)>FOV*.62||d<.1)return null;
+    const corrected=d*Math.cos(ang);
+    const sx=W/2+Math.tan(ang)/(Math.tan(FOV/2))*W/2;
+    return{d,corrected,sx};
+  }
+
+  const sprites=[];
+  for(const k of keySpots)if(!k.taken)sprites.push({x:k.x,y:k.y,type:"key"});
+  sprites.push({x:ghost.x,y:ghost.y,type:"ghost"});
+  sprites.push({x:exit.x,y:exit.y,type:"exit"});
+  sprites.sort((a,b)=>dist(player.x,player.y,b.x,b.y)-dist(player.x,player.y,a.x,a.y));
+
+  for(const s of sprites){
+    const p=projectSprite(s.x,s.y);if(!p)continue;
+    const size=s.type==="ghost"?Math.min(H*1.05,H/(p.d*.78)):
+      s.type==="exit"?Math.min(H,H/(p.d*1.25)):Math.min(H*1.1,H/(p.d*.9));
+    const half=s.type==="exit"?size*.32:size*.28;
+    const left=Math.max(0,Math.floor((p.sx-half)/strip));
+    const right=Math.min(rays-1,Math.ceil((p.sx+half)/strip));
+
+    for(let col=left;col<=right;col++){
+      if(p.corrected>=zBuffer[col])continue;
+      const x=col*strip,rel=(x-p.sx)/half;
+      ctx.save();ctx.globalAlpha=Math.max(0,1-Math.abs(rel)*.08);
+      if(s.type==="key"){
+        const cy=H/2,r=size*.16;
+        ctx.strokeStyle="#ffd21a";ctx.lineWidth=Math.max(2,size*.07);
+        ctx.beginPath();ctx.arc(p.sx,cy,r,0,Math.PI*2);ctx.stroke();
+        ctx.fillStyle="#ffd21a";ctx.fillRect(p.sx-size*.035,cy+size*.13,size*.07,size*.28);
+      }else if(s.type==="exit"){
+        const top=H/2-size*.65;
+        ctx.fillStyle=got===3?"#174f2c":"#202020";
+        ctx.fillRect(p.sx-size*.32,top,size*.64,size*1.3);
+        ctx.strokeStyle="#777";ctx.lineWidth=2;
+        ctx.strokeRect(p.sx-size*.32,top,size*.64,size*1.3);
+        ctx.fillStyle="#aaa";ctx.beginPath();
+        ctx.arc(p.sx+size*.18,H/2,size*.035,0,Math.PI*2);ctx.fill();
+      }else{
+        const cx=p.sx,base=H/2+size*.55,headY=H/2-size*.38,headR=size*.13;
+        ctx.strokeStyle="#080808";ctx.lineWidth=Math.max(4,size*.07);ctx.lineCap="round";
+        ctx.beginPath();
+        ctx.moveTo(cx-size*.07,H/2+size*.25);ctx.lineTo(cx-size*.11,base);
+        ctx.moveTo(cx+size*.07,H/2+size*.25);ctx.lineTo(cx+size*.11,base);
+        ctx.stroke();
+        ctx.fillStyle="#090909";ctx.beginPath();
+        ctx.ellipse(cx,H/2+size*.02,size*.16,size*.31,0,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle="#0b0b0b";ctx.lineWidth=Math.max(4,size*.055);
+        ctx.beginPath();
+        ctx.moveTo(cx-size*.13,H/2-size*.18);ctx.lineTo(cx-size*.27,H/2+size*.12);
+        ctx.moveTo(cx+size*.13,H/2-size*.18);ctx.lineTo(cx+size*.27,H/2+size*.12);
+        ctx.stroke();
+        ctx.fillStyle="#151515";ctx.beginPath();ctx.arc(cx,headY,headR,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle="#000";ctx.lineWidth=Math.max(3,size*.04);
+        ctx.beginPath();ctx.arc(cx,headY,headR*1.13,Math.PI*1.05,Math.PI*1.95);ctx.stroke();
+        ctx.fillStyle="#d20b0b";ctx.shadowColor="#f00";ctx.shadowBlur=Math.min(18,size*.16);
+        ctx.beginPath();ctx.arc(cx-size*.045,headY-size*.01,size*.018,0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc(cx+size*.045,headY-size*.01,size*.018,0,Math.PI*2);ctx.fill();
+        ctx.shadowBlur=0;
+      }
+      ctx.restore();
+    }
+  }
+
+  if(got===3){
+    const dx=exit.x-player.x,dy=exit.y-player.y;
+    const ang=Math.atan2(dy,dx)-player.a;
+    if(Math.abs(ang)<1){
+      ctx.fillStyle="#00cc66";ctx.font="bold 16px Tahoma";
+      ctx.textAlign="center";ctx.fillText("🚪 خروج",W/2,H*.18);
+    }
+  }
+}
+
+function loop(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  update(dt);render();requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function key(code,val){
+  if(code==="KeyW"||code==="ArrowUp")held.w=val;
+  if(code==="KeyS"||code==="ArrowDown")held.s=val;
+  if(code==="KeyA")held.a=val;
+  if(code==="KeyD")held.d=val;
+  if(code==="ArrowLeft")turn=-1;
+  if(code==="ArrowRight")turn=1;
+}
+addEventListener("keydown",e=>key(e.code,true));
+addEventListener("keyup",e=>key(e.code,false));
+
+canvas.addEventListener("mousemove",e=>{
+  if(playing&&e.buttons)player.a+=e.movementX*.003;
+});
+canvas.addEventListener("click",()=>{
+  if(playing&&canvas.requestPointerLock)canvas.requestPointerLock().catch(()=>{});
+});
+
+const joystick=document.getElementById("joystick");
+const stick=document.getElementById("stick");
+const cameraTouch=document.getElementById("cameraTouch");
+const cameraHint=document.getElementById("cameraHint");
+let joyId=null,joyX=0,joyY=0;
+const joyRadius=48;
+
+function resetJoystick(){
+  joyX=0;joyY=0;
+  held.w=false;held.s=false;held.a=false;held.d=false;
+  stick.style.transform="translate(0px,0px)";
+}
+function updateJoystick(clientX,clientY){
+  const r=joystick.getBoundingClientRect();
+  const cx=r.left+r.width/2,cy=r.top+r.height/2;
+  let dx=clientX-cx,dy=clientY-cy,len=Math.hypot(dx,dy);
+  if(len>joyRadius){dx=dx/len*joyRadius;dy=dy/len*joyRadius}
+  joyX=dx/joyRadius;joyY=dy/joyRadius;
+  stick.style.transform=translate(${dx}px,${dy}px);
+  const dead=.18;
+  held.w=joyY < -dead;held.s=joyY > dead;
+  held.a=joyX < -dead;held.d=joyX > dead;
+}
+joystick.addEventListener("touchstart",e=>{
+  e.preventDefault();if(joyId!==null)return;
+  const t=e.changedTouches[0];joyId=t.identifier;
+  updateJoystick(t.clientX,t.clientY);
+},{passive:false});
+joystick.addEventListener("touchmove",e=>{
+  e.preventDefault();
+  for(const t of e.changedTouches)if(t.identifier===joyId){
+    updateJoystick(t.clientX,t.clientY);break;
+  }
+},{passive:false});
+function endJoy(e){
+  for(const t of e.changedTouches)if(t.identifier===joyId){
+    joyId=null;resetJoystick();break;
+  }
+}
+joystick.addEventListener("touchend",endJoy,{passive:false});
+joystick.addEventListener("touchcancel",endJoy,{passive:false});
+
+joystick.addEventListener("pointerdown",e=>{
+  if(e.pointerType==="mouse")return;
+  e.preventDefault();joyId=e.pointerId;
+  joystick.setPointerCapture?.(e.pointerId);
+  updateJoystick(e.clientX,e.clientY);
+});
+joystick.addEventListener("pointermove",e=>{
+  if(e.pointerType==="mouse"||joyId!==e.pointerId)return;
+  e.preventDefault();updateJoystick(e.clientX,e.clientY);
+});
+joystick.addEventListener("pointerup",e=>{
+  if(e.pointerType==="mouse"||joyId!==e.pointerId)return;
+  joyId=null;resetJoystick();
+});
+
+let camId=null,camLastX=0;
+cameraTouch.addEventListener("touchstart",e=>{
+  e.preventDefault();if(camId!==null)return;
+  const t=e.changedTouches[0];camId=t.identifier;camLastX=t.clientX;
+  cameraHint.style.opacity="0";
+},{passive:false});
+cameraTouch.addEventListener("touchmove",e=>{
+  e.preventDefault();
+  for(const t of e.changedTouches)if(t.identifier===camId){
+    const dx=t.clientX-camLastX;player.a+=dx*.006;camLastX=t.clientX;break;
+  }
+},{passive:false});
+function endCam(e){
+  for(const t of e.changedTouches)if(t.identifier===camId){camId=null;break}
+}
+cameraTouch.addEventListener("touchend",endCam,{passive:false});
+cameraTouch.addEventListener("touchcancel",endCam,{passive:false});
+
+document.getElementById("soundToggle").onclick=()=>{
+  soundOn=!soundOn;
+  document.getElementById("soundToggle").textContent=soundOn?"🔊 صدا روشن":"🔇 صدا خاموش";
+  if(soundOn&&playing)startAmbient();else stopAmbient();
+};
+document.getElementById("restart").onclick=()=>start(gameMode);
+document.getElementById("hardMode").onclick=()=>start("hard");
+document.getElementById("easyMode").onclick=()=>start("easy");
+</script>
+
+<div id="flashlightBeam" aria-hidden="true"></div>
+<script>
+(()=>{
+  const beam=document.getElementById("flashlightBeam");
+  const style=document.createElement("style");
+  style.textContent=
+    #flashlightBeam{
+      position:fixed;inset:0;pointer-events:none;z-index:9999;
+      background:radial-gradient(circle 175px at 50% 50%,
+      transparent 0 112px,rgba(0,0,0,.18) 122px,
+      rgba(0,0,0,.72) 150px,#000 176px);
+    };
+  document.head.appendChild(style);
+})();
+</script>
+</body>
+</html>
